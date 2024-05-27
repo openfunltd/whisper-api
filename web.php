@@ -1,4 +1,4 @@
 <?php
 
-include(__DIR__ . '/WebDispatcher.php');
+include(__DIR__ . '/init.inc.php');
 WebDispatcher::dispatch();
