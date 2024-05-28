@@ -25,7 +25,7 @@ class JobHelper
         return $data_dir . "/job/{$job_id}.json";
     }
 
-    public static function getWavFromURL($url)
+    public static function getWavFromURL($url, $logger)
     {
         if (!getenv('data_dir')) {
             throw new Exception("data_dir not set");
@@ -41,11 +41,12 @@ class JobHelper
         $crc32 = hash('crc32b', $url);
         $output_file = "{$data_dir}/tmp/{$hostname}_{$crc32}.wav";
         if (file_exists($output_file)) {
+            $logger("$url already downloaded");
             return $output_file;
         }
 
         if (strpos($url, 'https://ivod.ly.gov.tw/') === 0) {
-            error_log("download from $url");
+            $logger("downloading $url");
             $curl = curl_init();
             curl_setopt($curl, CURLOPT_URL, $url);
             curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
@@ -58,6 +59,7 @@ class JobHelper
             $tmp_mp4_file = tempnam("{$data_dir}/tmp", 'download_');
             unlink($tmp_mp4_file);
             $tmp_mp4_file .= '.mp4';
+            $logger("downloading $matches[1]");
             system(sprintf("yt-dlp -o %s %s", escapeshellarg($tmp_mp4_file), escapeshellarg($matches[1])), $ret);
             if ($ret != 0) {
                 unlink($tmp_mp4_file);
@@ -66,6 +68,7 @@ class JobHelper
             $tmp_wav_file = tempnam("{$data_dir}/tmp", 'download_');
             unlink($tmp_wav_file);
             $tmp_wav_file .= '.wav';
+            $logger("converting mp4 to wav");
             system(sprintf("ffmpeg -i %s -acodec pcm_s16le -ar 16000 %s", escapeshellarg($tmp_mp4_file), escapeshellarg($tmp_wav_file)), $ret);
             if ($ret != 0) {
                 unlink($tmp_mp4_file);
@@ -165,6 +168,18 @@ class JobHelper
         }
 
         return $job_id;
+    }
+
+    public static function log($job_id, $msg)
+    {
+        $job_file = self::getJobFile($job_id);
+        $job = json_decode(file_get_contents($job_file));
+        $job->log = $job->log ?? [];
+        $job->log[] = [
+            'time' => date('Y-m-d H:i:s'),
+            'msg' => $msg,
+        ];
+        file_put_contents($job_file, json_encode($job));
     }
 
 
