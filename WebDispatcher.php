@@ -12,6 +12,30 @@ class WebDispatcher
         return $ret;
     }
 
+    public static function queueResult()
+    {
+        $job_id = $_GET['job_id'] ?? false;
+        if (!$job_id) {
+            return self::error('job_id is required');
+        }
+        $key = $_GET['key'] ?? '';
+        $name = self::checkKey($key);
+
+        $job_file = JobHelper::getJobFile($job_id);
+        if (!file_exists($job_file)) {
+            return self::error('job not found');
+        }
+
+        $job = json_decode(file_get_contents($job_file));
+        if ($job->data->name != $name) {
+            return self::error('key not match');
+        }
+        return self::json([
+            'status' => 'ok',
+            'job' => $job,
+        ]);
+    }
+
     public static function queueAdd()
     {
         $data = [];
@@ -79,7 +103,7 @@ class WebDispatcher
         } elseif ($uri == '/queue') {
             echo 'TODO';
         } elseif ($uri == '/queue/result') {
-            echo 'TODO';
+            return self::queueResult();
         } else {
             echo '404';
             exit;
