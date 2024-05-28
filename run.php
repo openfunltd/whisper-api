@@ -46,6 +46,38 @@ if ($job->data->tool == 'whisperx') {
     }
     JobHelper::updateData($job_id, 'result', $result);
     JobHelper::updateStatus($job_id, 'done');
+} elseif ('whisper.cpp' == $job->data->tool) {
+    $file = JobHelper::getWavFromURL($job->data->url, $logger);
+    $output_file = getenv('data_dir') . '/tmp/' . WebDispatcher::uniqid(12);
+    $whispercpp_dir = getenv('whispercpp_dir');
+    if ($job->data->language ?? false) {
+        $params .= ' --language ' . escapeshellarg($job->data->language);
+    }
+    $job->data->model = $job->data->model ?? 'large-v3';
+    $params .= ' --model ' . escapeshellarg("{$whispercpp_dir}/models/ggml-{$job->data->model}.bin");
+
+    if ($job->data->init_prompt ?? false) {
+        $params .= ' --init_prompt ' . escapeshellarg($job->data->init_prompt);
+    }
+
+    $logger("running whisper.cpp");
+    $cmd = sprintf("%s %s %s > %s",
+        escapeshellcmd("{$whispercpp_dir}/main"),
+        $params,
+        escapeshellarg($file),
+        escapeshellarg($output_file)
+    );
+    system($cmd, $ret);
+
+    $result = new StdClass;
+    $result->txt = file_get_contents($output_file);
+
+    JobHelper::updateData($job_id, 'result', $result);
+    JobHelper::updateStatus($job_id, 'done');
+} else {
+    $logger("unknown tool: " . $job->data->tool);
+    JobHelper::updateStatus($job_id, 'error');
+    exit;
 }
 
 if ($job->data->callback ?? false) {
