@@ -74,6 +74,24 @@ if ($job->data->tool == 'whisperx') {
 
     JobHelper::updateData($job_id, 'result', $result);
     JobHelper::updateStatus($job_id, 'done');
+} elseif ('pyannote' == $job->data->tool) {
+    $file = JobHelper::getWavFromURL($job->data->url, $logger);
+    $output_file = getenv('data_dir') . '/tmp/' . WebDispatcher::uniqid(12);
+    $pyannote_script = getenv('pyannote_script');
+
+    $logger("running pyannote");
+    $cmd = sprintf("conda run -n pyannote python %s %s > %s",
+        escapeshellarg($pyannote_script),
+        $file,
+        escapeshellarg($output_file)
+    );
+    system($cmd, $ret);
+
+    $result = new StdClass;
+    $result->result = json_decode(file_get_contents($output_file));
+
+    JobHelper::updateData($job_id, 'result', $result);
+    JobHelper::updateStatus($job_id, 'done');
 } else {
     $logger("unknown tool: " . $job->data->tool);
     JobHelper::updateStatus($job_id, 'error');
