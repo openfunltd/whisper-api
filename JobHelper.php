@@ -184,6 +184,8 @@ class JobHelper
         $job = json_decode(file_get_contents($job_file));
         $job->status = $status;
         file_put_contents($job_file, json_encode($job));
+
+        self::log($job_id, "status: $status");
     }
 
     public static function log($job_id, $msg)
