@@ -149,20 +149,12 @@ class JobHelper
         $ymd = date('Ymd');
 
         $job_id = WebDispatcher::uniqid(16);
+        $data['job_id'] = $job_id;
+        $data['queued_at'] = date('Y-m-d H:i:s');
 
-        file_put_contents($data_dir . "/queue/{$ymd}.jsonl", json_encode([
-            'job_id' => $job_id,
-            'data' => $data,
-            'queued_at' => time(),
-        ]) . "\n", FILE_APPEND);
-
-        file_put_contents($data_dir . "/job/{$job_id}.json", json_encode([
-            'job_id' => $job_id,
-            'data' => $data,
-            'status' => 'queued',
-            'queued_at' => time(),
-        ]));
-
+        file_put_contents($data_dir . "/queue/{$ymd}.jsonl", json_encode($data) . "\n", FILE_APPEND);
+        $data['status'] = 'queued';
+        file_put_contents($data_dir . "/job/{$job_id}.json", json_encode($data) . "\n", FILE_APPEND);
         if (!file_exists($data_dir . '/queue_counter')) {
             file_put_contents($data_dir . '/queue_counter', "{$ymd}:0");
         }

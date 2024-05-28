@@ -27,7 +27,7 @@ class WebDispatcher
         }
 
         $job = json_decode(file_get_contents($job_file));
-        if ($job->data->name != $name) {
+        if ($job->name != $name) {
             return self::error('key not match');
         }
         return self::json([
@@ -39,19 +39,29 @@ class WebDispatcher
     public static function queueAdd()
     {
         $data = [];
-        $data['url'] = $_GET['url'] ?? false;
-        if (!$data['url']) {
-            return self::error('url is required');
-        }
-        $data['init_prompt'] = $_GET['init_prompt'] ?? '';
-        $data['tool'] = $_GET['tool'] ?? 'whisperx';
-        $data['diarize'] = intval($_GET['diarize'] ?? 0);
-        $data['type'] = $_GET['type'] ?? 'auto';
+        $required = [
+            'whisper.cpp' => ['url'],
+            'whisperx' => ['url'],
+            'pyannote' => ['url'],
+        ];
 
         $key = $_GET['key'] ?? '';
         $name = self::checkKey($key);
+        unset($_GET['key']);
         $data['name'] = $name;
-        $data['callback'] = $_GET['callback'] ?? '';
+
+        $tool = $_GET['tool'] ?? false;
+        $data['tool'] = $tool;
+        if (!array_key_exists($tool, $required)) {
+            return self::error("tool '{$tool}' not found");
+        }
+
+        foreach ($required[$tool] as $k) {
+            if (!isset($_REQUEST[$k])) {
+                return self::error("{$k} is required");
+            }
+        }
+        $data['data'] = $_REQUEST;
 
         try {
             $job_id = JobHelper::enqueue($data);

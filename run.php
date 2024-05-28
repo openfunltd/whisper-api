@@ -7,13 +7,11 @@ $logger = function($msg) use ($job_id) {
 };
 $job_file = JobHelper::getJobFile($job_id);
 $job = json_decode(file_get_contents($job_file));
-if ($job->data->status == 'done') {
+if ($job->status == 'done') {
     exit;
 }
 
-$job->data->tool = $job->data->tool ?? 'whisperx';
-
-if ($job->data->tool == 'whisperx') {
+if ($job->tool == 'whisperx') {
     $file = JobHelper::getWavFromURL($job->data->url, $logger);
     $params = '';
     if ($job->data->diarize) {
@@ -46,7 +44,7 @@ if ($job->data->tool == 'whisperx') {
     }
     JobHelper::updateData($job_id, 'result', $result);
     JobHelper::updateStatus($job_id, 'done');
-} elseif ('whisper.cpp' == $job->data->tool) {
+} elseif ('whisper.cpp' == $job->tool) {
     $file = JobHelper::getWavFromURL($job->data->url, $logger);
     $output_file = getenv('data_dir') . '/tmp/' . WebDispatcher::uniqid(12);
     $whispercpp_dir = getenv('whispercpp_dir');
@@ -74,7 +72,7 @@ if ($job->data->tool == 'whisperx') {
 
     JobHelper::updateData($job_id, 'result', $result);
     JobHelper::updateStatus($job_id, 'done');
-} elseif ('pyannote' == $job->data->tool) {
+} elseif ('pyannote' == $job->tool) {
     $file = JobHelper::getWavFromURL($job->data->url, $logger);
     $output_file = getenv('data_dir') . '/tmp/' . WebDispatcher::uniqid(12);
     $pyannote_script = getenv('pyannote_script');
@@ -93,7 +91,7 @@ if ($job->data->tool == 'whisperx') {
     JobHelper::updateData($job_id, 'result', $result);
     JobHelper::updateStatus($job_id, 'done');
 } else {
-    $logger("unknown tool: " . $job->data->tool);
+    $logger("unknown tool: " . $job->tool);
     JobHelper::updateStatus($job_id, 'error');
     exit;
 }
