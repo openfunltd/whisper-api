@@ -61,6 +61,7 @@ class WebDispatcher
         return self::json([
             'status' => 'ok',
             'job_id' => $job_id,
+            'api_url' => sprintf("https://%s/queue/result?job_id=%s&key=%s", $_SERVER['HTTP_HOST'], $job_id, $key),
         ]);
     }
 
