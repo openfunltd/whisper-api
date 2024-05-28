@@ -47,3 +47,19 @@ if ($job->data->tool == 'whisperx') {
     JobHelper::updateData($job_id, 'result', $result);
     JobHelper::updateStatus($job_id, 'done');
 }
+
+if ($job->data->callback ?? false) {
+    $logger("callbacking to $callback_url");
+    $callback_url = $job->data->callback;
+    $curl = curl_init($callback_url);
+    curl_setopt($curl, CURLOPT_POST, true);
+    $job_file = JobHelper::getJobFile($job_id);
+    $job = json_decode(file_get_contents($job_file));
+    curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode([
+        'job_id' => $job_id,
+        'job' => $job,
+    ]));
+    curl_setopt($curl, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_exec($curl);
+    curl_close($curl);
+}
