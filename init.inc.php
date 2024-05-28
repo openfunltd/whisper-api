@@ -4,3 +4,4 @@ if (file_exists(__DIR__ . '/config.php')) {
     include(__DIR__ . '/config.php');
 }
 include(__DIR__ . '/WebDispatcher.php');
+include(__DIR__ . '/JobHelper.php');

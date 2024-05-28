@@ -12,46 +12,6 @@ class WebDispatcher
         return $ret;
     }
 
-    public static function enqueue($data)
-    {
-        if (!getenv('data_dir')) {
-            return self::error('data_dir not set');
-        }
-        $data_dir = getenv('data_dir');
-        if (!file_exists($data_dir)) {
-            mkdir($data_dir, 0777, true);
-        }
-        if (!file_exists($data_dir . '/queue')) {
-            mkdir($data_dir . '/queue', 0777, true);
-        }
-        if (!file_exists($data_dir . '/job')) {
-            mkdir($data_dir . '/job', 0777, true);
-        }
-
-        $ymd = date('Ymd');
-
-        $job_id = self::uniqid(16);
-
-        file_put_contents($data_dir . "/queue/{$ymd}.jsonl", json_encode([
-            'job_id' => $job_id,
-            'data' => $data,
-            'queued_at' => time(),
-        ]) . "\n", FILE_APPEND);
-
-        file_put_contents($data_dir . "/job/{$job_id}.json", json_encode([
-            'job_id' => $job_id,
-            'data' => $data,
-            'status' => 'queued',
-            'queued_at' => time(),
-        ]));
-
-        if (!file_exists($data_dir . '/queue_counter')) {
-            file_put_contents($data_dir . '/queue_counter', "{$ymd}:0");
-        }
-
-        return $job_id;
-    }
-
     public static function queueAdd()
     {
         $data = [];
@@ -69,7 +29,11 @@ class WebDispatcher
         $data['name'] = $name;
         $data['callback'] = $_GET['callback'] ?? '';
 
-        $job_id = self::enqueue($data);
+        try {
+            $job_id = JobHelper::enqueue($data);
+        } catch (Exception $e) {
+            return self::error($e->getMessage());
+        }
         return self::json([
             'status' => 'ok',
             'job_id' => $job_id,
@@ -121,4 +85,5 @@ class WebDispatcher
             exit;
         }
     }
+
 }
