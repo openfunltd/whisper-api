@@ -170,6 +170,22 @@ class JobHelper
         return $job_id;
     }
 
+    public static function updateData($job_id, $key, $value)
+    {
+        $job_file = self::getJobFile($job_id);
+        $job = json_decode(file_get_contents($job_file));
+        $job->data->$key = $value;
+        file_put_contents($job_file, json_encode($job));
+    }
+
+    public static function updateStatus($job_id, $status)
+    {
+        $job_file = self::getJobFile($job_id);
+        $job = json_decode(file_get_contents($job_file));
+        $job->status = $status;
+        file_put_contents($job_file, json_encode($job));
+    }
+
     public static function log($job_id, $msg)
     {
         $job_file = self::getJobFile($job_id);
