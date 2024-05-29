@@ -102,7 +102,7 @@ class WebDispatcher
     public static function json($ret)
     {
         header('Content-Type: application/json');
-        echo json_encode($ret);
+        echo json_encode($ret, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
