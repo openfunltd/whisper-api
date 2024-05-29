@@ -26,7 +26,7 @@ if ($job->tool == 'whisperx') {
         $params .= ' --model large-v3';
     }
     if ($job->data->init_prompt ?? false) {
-        $params .= ' --init_prompt ' . escapeshellarg($job->data->init_prompt);
+        $params .= ' --initial_prompt ' . escapeshellarg($job->data->init_prompt);
     }
 
     $output_dir = getenv('data_dir') . '/tmp/' . WebDispatcher::uniqid(12);
@@ -55,7 +55,7 @@ if ($job->tool == 'whisperx') {
     $params .= ' --model ' . escapeshellarg("{$whispercpp_dir}/models/ggml-{$job->data->model}.bin");
 
     if ($job->data->init_prompt ?? false) {
-        $params .= ' --init_prompt ' . escapeshellarg($job->data->init_prompt);
+        $params .= ' --prompt ' . escapeshellarg($job->data->init_prompt);
     }
 
     $logger("running whisper.cpp");
