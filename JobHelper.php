@@ -25,6 +25,34 @@ class JobHelper
         return $data_dir . "/job/{$job_id}.json";
     }
 
+    public static function videoToWav($mp4_file, $logger, $output_file)
+    {
+        $data_dir = getenv('data_dir');
+        $tmp_wav_file = tempnam("{$data_dir}/tmp", 'download_');
+        unlink($tmp_wav_file);
+        $tmp_wav_file .= '.wav';
+        $logger("converting mp4 to wav");
+        system(sprintf("ffmpeg -i %s -acodec pcm_s16le -ar 16000 %s", escapeshellarg($mp4_file), escapeshellarg($tmp_wav_file)), $ret);
+        if ($ret != 0) {
+            unlink($mp4_file);
+            unlink($tmp_wav_file);
+            throw new Exception("ffmpeg failed");
+        }
+        unlink($mp4_file);
+        rename($tmp_wav_file, $output_file);
+        return $output_file;
+    }
+
+    public static function getCacheNameFromURL($url)
+    {
+        if (strpos($url, 'https://storage.googleapis.com/') === 0) {
+            $url = preg_replace('#\?(.*)$#', $url, $matches);
+        }
+        $hostname = parse_url($url, PHP_URL_HOST);
+        $crc32 = hash('crc32b', $url);
+        return "{$hostname}_{$crc32}";
+    }
+
     public static function getWavFromURL($url, $logger)
     {
         if (!getenv('data_dir')) {
@@ -37,9 +65,8 @@ class JobHelper
         if (!file_exists("{$data_dir}/tmp")) {
             mkdir("{$data_dir}/tmp", 0777, true);
         }
-        $hostname = parse_url($url, PHP_URL_HOST);
-        $crc32 = hash('crc32b', $url);
-        $output_file = "{$data_dir}/tmp/{$hostname}_{$crc32}.wav";
+        $filename = self::getCacheNameFromURL($url);
+        $output_file = "{$data_dir}/tmp/{$filename}.wav";
         if (file_exists($output_file)) {
             $logger("$url already downloaded");
             return $output_file;
@@ -65,19 +92,25 @@ class JobHelper
                 unlink($tmp_mp4_file);
                 throw new Exception("yt-dlp failed");
             }
-            $tmp_wav_file = tempnam("{$data_dir}/tmp", 'download_');
-            unlink($tmp_wav_file);
-            $tmp_wav_file .= '.wav';
-            $logger("converting mp4 to wav");
-            system(sprintf("ffmpeg -i %s -acodec pcm_s16le -ar 16000 %s", escapeshellarg($tmp_mp4_file), escapeshellarg($tmp_wav_file)), $ret);
-            if ($ret != 0) {
-                unlink($tmp_mp4_file);
-                unlink($tmp_wav_file);
-                throw new Exception("ffmpeg failed");
-            }
+            return self::videoToWav($tmp_mp4_file, $logger, $output_file);
+        } elseif (strpos($url, 'https://storage.googleapis.com/') === 0) {
+            $logger("downloading $url");
+            $tmp_mp4_file = tempnam("{$data_dir}/tmp", 'download_');
             unlink($tmp_mp4_file);
-            rename($tmp_wav_file, $output_file);
-            return $output_file;
+            $tmp_mp4_file .= '.mp4';
+
+            $curl = curl_init();
+            curl_setopt($curl, CURLOPT_URL, $url);
+            // output to $tmp_mp4_file
+            curl_setopt($curl, CURLOPT_FILE, fopen($tmp_mp4_file, 'w'));
+            curl_exec($curl);
+            $info = curl_getinfo($curl);
+            curl_close($curl);
+            if ($info['http_code'] != 200) {
+                unlink($tmp_mp4_file);
+                throw new Exception("download failed");
+            }
+            return self::videoToWav($tmp_mp4_file, $logger, $output_file);
         } else {
         }
     }
