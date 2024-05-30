@@ -45,9 +45,9 @@ class WebDispatcher
             'pyannote' => ['url'],
         ];
 
-        $key = $_GET['key'] ?? '';
+        $key = $_REQUEST['key'] ?? '';
         $name = self::checkKey($key);
-        unset($_GET['key']);
+        unset($_REQUEST['key']);
         $data['name'] = $name;
 
         $tool = $_GET['tool'] ?? false;
