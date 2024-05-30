@@ -48,6 +48,7 @@ if ($job->tool == 'whisperx') {
     $file = JobHelper::getWavFromURL($job->data->url, $logger);
     $output_file = getenv('data_dir') . '/tmp/' . WebDispatcher::uniqid(12);
     $whispercpp_dir = getenv('whispercpp_dir');
+    $job->data->language = $job->data->language ?? 'zh';
     if ($job->data->language ?? false) {
         $params .= ' --language ' . escapeshellarg($job->data->language);
     }
