@@ -19,6 +19,8 @@ if ($job->tool == 'whisperx') {
     }
     if ($job->data->language ?? false) {
         $params .= ' --language ' . escapeshellarg($job->data->language);
+    } else {
+        $params .= ' --language zh';
     }
     if ($job->data->model ?? false) {
         $params .= ' --model ' . escapeshellarg($job->data->model);
