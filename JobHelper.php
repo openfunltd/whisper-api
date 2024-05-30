@@ -12,6 +12,7 @@ class JobHelper
             }
 
             $job_id = $job->job_id;
+            error_log("job_id: $job_id");
             system(sprintf("php %s/run.php %s", __DIR__, $job_id));
         }
     }
