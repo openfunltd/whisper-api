@@ -200,7 +200,7 @@ class JobHelper
     {
         $job_file = self::getJobFile($job_id);
         $job = json_decode(file_get_contents($job_file));
-        $job->data->$key = $value;
+        $job->$key = $value;
         file_put_contents($job_file, json_encode($job));
     }
 
