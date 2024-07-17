@@ -32,7 +32,7 @@ class JobHelper
         $tmp_wav_file = tempnam("{$data_dir}/tmp", 'download_');
         unlink($tmp_wav_file);
         $tmp_wav_file .= '.wav';
-        $logger("converting mp4 to wav");
+        $logger("converting mp4 to wav", $tmp_wav_file);
         system(sprintf("ffmpeg -i %s -acodec pcm_s16le -ar 16000 %s", escapeshellarg($mp4_file), escapeshellarg($tmp_wav_file)), $ret);
         if ($ret != 0) {
             unlink($mp4_file);
@@ -46,12 +46,43 @@ class JobHelper
 
     public static function getCacheNameFromURL($url)
     {
+        if (strpos($url, 'file://') === 0) {
+            return substr($url, 7);
+        }
         if (strpos($url, 'https://storage.googleapis.com/') === 0) {
             $url = preg_replace('#\?(.*)$#', $url, $matches);
         }
         $hostname = parse_url($url, PHP_URL_HOST);
         $crc32 = hash('crc32b', $url);
         return "{$hostname}_{$crc32}";
+    }
+
+    public static function cleanCacheFromURL($url)
+    {
+        if (!getenv('data_dir')) {
+            throw new Exception("data_dir not set");
+        }
+        $data_dir = getenv('data_dir');
+        if (!file_exists($data_dir)) {
+            mkdir($data_dir, 0777, true);
+        } 
+        if (!file_exists("{$data_dir}/tmp")) {
+            mkdir("{$data_dir}/tmp", 0777, true);
+        }
+        $filename = self::getCacheNameFromURL($url);
+        $output_file = "{$data_dir}/tmp/{$filename}.wav";
+        if (file_exists($output_file)) {
+            unlink($output_file);
+            return true;
+        }
+        if (strpos($url, 'file://') === 0) {
+            $input_file = "{$data_dir}/tmp/" . substr($url, 7);
+            if (file_exists($input_file)) {
+                unlink($input_file);
+                return true;
+            }
+        }
+        return false;
     }
 
     public static function getWavFromURL($url, $logger)
@@ -69,11 +100,14 @@ class JobHelper
         $filename = self::getCacheNameFromURL($url);
         $output_file = "{$data_dir}/tmp/{$filename}.wav";
         if (file_exists($output_file)) {
-            $logger("$url already downloaded");
+            $logger("$url already downloaded", $output_file);
             return $output_file;
         }
 
-        if (strpos($url, 'https://ivod.ly.gov.tw/') === 0) {
+        if (strpos($url, 'file://') === 0) { 
+            $input_file = "{$data_dir}/tmp/" . substr($url, 7);
+            return self::videoToWav($input_file, $logger, $output_file);
+        } else if (strpos($url, 'https://ivod.ly.gov.tw/') === 0) {
             $logger("downloading $url");
             $curl = curl_init();
             curl_setopt($curl, CURLOPT_URL, $url);
@@ -87,18 +121,23 @@ class JobHelper
             $tmp_mp4_file = tempnam("{$data_dir}/tmp", 'download_');
             unlink($tmp_mp4_file);
             $tmp_mp4_file .= '.mp4';
-            $logger("downloading $matches[1]");
+            $logger("downloading $matches[1]", $tmp_mp4_file);
             system(sprintf("yt-dlp -o %s %s", escapeshellarg($tmp_mp4_file), escapeshellarg($matches[1])), $ret);
             if ($ret != 0) {
                 unlink($tmp_mp4_file);
-                throw new Exception("yt-dlp failed");
+
+                system(sprintf("yt-dlp --legacy-server-connect -o %s %s", escapeshellarg($tmp_mp4_file), escapeshellarg($matches[1])), $ret);
+                if ($ret != 0) {
+                    unlink($tmp_mp4_file);
+                    throw new Exception("yt-dlp failed");
+                }
             }
             return self::videoToWav($tmp_mp4_file, $logger, $output_file);
         } elseif (strpos($url, 'https://storage.googleapis.com/') === 0) {
-            $logger("downloading $url");
             $tmp_mp4_file = tempnam("{$data_dir}/tmp", 'download_');
             unlink($tmp_mp4_file);
             $tmp_mp4_file .= '.mp4';
+            $logger("downloading $url", $tmp_mp4_file);
 
             $curl = curl_init();
             curl_setopt($curl, CURLOPT_URL, $url);
@@ -214,7 +253,7 @@ class JobHelper
         self::log($job_id, "status: $status");
     }
 
-    public static function log($job_id, $msg)
+    public static function log($job_id, $msg, $target = null)
     {
         $job_file = self::getJobFile($job_id);
         $job = json_decode(file_get_contents($job_file));
@@ -222,6 +261,7 @@ class JobHelper
         $job->log[] = [
             'time' => date('Y-m-d H:i:s'),
             'msg' => $msg,
+            'target' => $target,
         ];
         file_put_contents($job_file, json_encode($job));
     }

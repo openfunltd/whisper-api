@@ -40,9 +40,11 @@ class WebDispatcher
     {
         $data = [];
         $required = [
+            'file_upload' => ['file'],
             'whisper.cpp' => ['url'],
             'whisperx' => ['url'],
             'pyannote' => ['url'],
+            'clean' => ['url'],
         ];
 
         $key = $_REQUEST['key'] ?? '';
@@ -54,6 +56,19 @@ class WebDispatcher
         $data['tool'] = $tool;
         if (!array_key_exists($tool, $required)) {
             return self::error("tool '{$tool}' not found");
+        }
+        if ($tool == 'file_upload') {
+            if (!isset($_FILES['file'])) {
+                return self::error('file is required');
+            }
+            $data['file'] = $_FILES['file'];
+            $fileext = pathinfo($data['file']['name'], PATHINFO_EXTENSION);
+            $tmpfile = self::uniqid(12) . '.' . $fileext;
+            move_uploaded_file($data['file']['tmp_name'], getenv('data_dir') . '/tmp/' . $tmpfile);
+            return self::json([
+                'status' => 'ok',
+                'file_url' => 'file://' . $tmpfile, 
+            ]);
         }
 
         foreach ($required[$tool] as $k) {

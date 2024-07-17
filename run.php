@@ -2,8 +2,8 @@
 
 include(__DIR__ . '/init.inc.php');
 $job_id = $argv[1];
-$logger = function($msg) use ($job_id) {
-    JobHelper::log($job_id, $msg);
+$logger = function($msg, $target = null) use ($job_id) {
+    JobHelper::log($job_id, $msg, $target);
 };
 $job_file = JobHelper::getJobFile($job_id);
 $job = json_decode(file_get_contents($job_file));
@@ -45,6 +45,7 @@ try {
             $ext = pathinfo($output_file, PATHINFO_EXTENSION);
             $result->$ext = file_get_contents($output_file);
         }
+        system("rm -rf $output_dir");
         JobHelper::updateData($job_id, 'result', $result);
         JobHelper::updateStatus($job_id, 'done');
     } elseif ('whisper.cpp' == $job->tool) {
@@ -74,6 +75,7 @@ try {
         $result = new StdClass;
         $result->txt = file_get_contents($output_file);
 
+        unlink($output_file);
         JobHelper::updateData($job_id, 'result', $result);
         JobHelper::updateStatus($job_id, 'done');
     } elseif ('pyannote' == $job->tool) {
@@ -92,7 +94,12 @@ try {
         $result = new StdClass;
         $result->result = json_decode(file_get_contents($output_file));
 
+        unlink($output_file);
         JobHelper::updateData($job_id, 'result', $result);
+        JobHelper::updateStatus($job_id, 'done');
+    } elseif ('clean' == $job->tool) {
+        $logger("cleaning cache");
+        JobHelper::cleanCacheFromURL($job->data->url);
         JobHelper::updateStatus($job_id, 'done');
     } else {
         $logger("unknown tool: " . $job->tool);
