@@ -117,6 +117,11 @@ class WebDispatcher
     public static function json($ret)
     {
         header('Content-Type: application/json');
+        // XSRF
+        header('Access-Control-Allow-Origin: *');
+        // allow post
+        header('Access-Control-Allow-Methods: POST');
+
         echo json_encode($ret, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
