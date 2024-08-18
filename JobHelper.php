@@ -107,6 +107,23 @@ class JobHelper
         if (strpos($url, 'file://') === 0) { 
             $input_file = "{$data_dir}/tmp/" . substr($url, 7);
             return self::videoToWav($input_file, $logger, $output_file);
+        } else if (strpos($url, '.m3u8') !== false) {
+            $tmp_mp4_file = tempnam("{$data_dir}/tmp", 'download_');
+            unlink($tmp_mp4_file);
+            $tmp_mp4_file .= '.mp4';
+            $logger("downloading $url", $tmp_mp4_file);
+            $url = trim($url);
+            system(sprintf("yt-dlp -o %s %s", escapeshellarg($tmp_mp4_file), escapeshellarg($url)), $ret);
+            if ($ret != 0) {
+                unlink($tmp_mp4_file);
+
+                system(sprintf("yt-dlp --legacy-server-connect -o %s %s", escapeshellarg($tmp_mp4_file), escapeshellarg($url)), $ret);
+                if ($ret != 0) {
+                    unlink($tmp_mp4_file);
+                    throw new Exception("yt-dlp failed");
+                }
+            }
+            return self::videoToWav($tmp_mp4_file, $logger, $output_file);
         } else if (strpos($url, 'https://ivod.ly.gov.tw/') === 0) {
             $logger("downloading $url");
             $curl = curl_init();
