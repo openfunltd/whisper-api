@@ -125,6 +125,7 @@ class JobHelper
             }
             return self::videoToWav($tmp_mp4_file, $logger, $output_file);
         } else if (strpos($url, 'https://ivod.ly.gov.tw/') === 0) {
+            error_log("downloading $url");
             $logger("downloading $url");
             $curl = curl_init();
             curl_setopt($curl, CURLOPT_URL, $url);
@@ -135,15 +136,38 @@ class JobHelper
             if (!preg_match('#readyPlayer\("([^"]*)#', $content, $matches)) {
                 throw new Exception("readyPlayer not found");
             }
+            $m3u8_url = $matches[1];
+            if (preg_match('#/Play/Clip/1M/(\d+)#', $url, $matches)) {
+                $video_id = $matches[1];
+                $tmp_wav_file = "{$data_dir}/tmp/lyivod-clip-{$video_id}.wav";
+                if (file_exists($tmp_wav_file)) {
+                    $logger("already downloaded", $tmp_wav_file);
+                    return $tmp_wav_file;
+                }
+                $logger("download ivod and merge to wav", $tmp_wav_file);
+                $cmd = (sprintf("php %s %s %s %s",
+                    escapeshellarg(__DIR__ . "/customs/get-ly-ivod-clip.php"),
+                    escapeshellarg($video_id),
+                    escapeshellarg($tmp_wav_file),
+                    escapeshellarg($data_dir . "/tmp")
+                ));
+                error_log($cmd);
+                system($cmd, $ret);
+                if ($ret != 0) {
+                    unlink($tmp_wav_file);
+                    throw new Exception("get-ly-ivod.php failed");
+                }
+                return $tmp_wav_file;
+            }
             $tmp_mp4_file = tempnam("{$data_dir}/tmp", 'download_');
             unlink($tmp_mp4_file);
             $tmp_mp4_file .= '.mp4';
-            $logger("downloading $matches[1]", $tmp_mp4_file);
-            system(sprintf("yt-dlp -o %s %s", escapeshellarg($tmp_mp4_file), escapeshellarg($matches[1])), $ret);
+            $logger("downloading $m3u8_url", $tmp_mp4_file);
+            system(sprintf("yt-dlp -o %s %s", escapeshellarg($tmp_mp4_file), escapeshellarg($m3u8_url)), $ret);
             if ($ret != 0) {
                 unlink($tmp_mp4_file);
 
-                system(sprintf("yt-dlp --legacy-server-connect -o %s %s", escapeshellarg($tmp_mp4_file), escapeshellarg($matches[1])), $ret);
+                system(sprintf("yt-dlp --legacy-server-connect -o %s %s", escapeshellarg($tmp_mp4_file), escapeshellarg($m3u8_url)), $ret);
                 if ($ret != 0) {
                     unlink($tmp_mp4_file);
                     throw new Exception("yt-dlp failed");
