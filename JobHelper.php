@@ -138,6 +138,7 @@ class JobHelper
             }
             $m3u8_url = $matches[1];
             if (preg_match('#/Play/Clip/1M/(\d+)#', $url, $matches)) {
+                $url = str_replace('/1M/', '/300K/', $url);
                 $video_id = $matches[1];
                 $tmp_wav_file = "{$data_dir}/tmp/lyivod-clip-{$video_id}.wav";
                 if (file_exists($tmp_wav_file)) {

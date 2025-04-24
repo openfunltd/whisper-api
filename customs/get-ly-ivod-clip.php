@@ -3,7 +3,7 @@
 $video_id = $_SERVER['argv'][1];
 
 $get_m3u8_by_id = function($video_id) {
-    $url = sprintf("https://ivod.ly.gov.tw/Play/Clip/1M/%d", $video_id);
+    $url = sprintf("https://ivod.ly.gov.tw/Play/Clip/300K/%d", $video_id);
     $curl = curl_init();
     curl_setopt($curl, CURLOPT_URL, $url);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
