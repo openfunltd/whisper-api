@@ -117,7 +117,7 @@ class JobHelper
             if ($ret != 0) {
                 unlink($tmp_mp4_file);
 
-                system(sprintf("yt-dlp --legacy-server-connect -o %s %s", escapeshellarg($tmp_mp4_file), escapeshellarg($url)), $ret);
+                system(sprintf("yt-dlp --concurrent-fragments 3 --legacy-server-connect -o %s %s", escapeshellarg($tmp_mp4_file), escapeshellarg($url)), $ret);
                 if ($ret != 0) {
                     unlink($tmp_mp4_file);
                     throw new Exception("yt-dlp failed");
@@ -167,7 +167,7 @@ class JobHelper
             if ($ret != 0) {
                 unlink($tmp_mp4_file);
 
-                system(sprintf("yt-dlp --legacy-server-connect -o %s %s", escapeshellarg($tmp_mp4_file), escapeshellarg($m3u8_url)), $ret);
+                system(sprintf("yt-dlp --concurrent-fragments 3 --legacy-server-connect -o %s %s", escapeshellarg($tmp_mp4_file), escapeshellarg($m3u8_url)), $ret);
                 if ($ret != 0) {
                     unlink($tmp_mp4_file);
                     throw new Exception("yt-dlp failed");
