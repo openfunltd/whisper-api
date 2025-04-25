@@ -1,4 +1,5 @@
 import whisper
+import whisperx
 import json
 import sys
 import os
@@ -6,13 +7,15 @@ import http.server
 import torch
 import gc
 from pyannote.audio import Pipeline
+import traceback
 
-PORT = 8080 
+PORT = 31500 
 if 'PORT' in os.environ:
     PORT = int(os.environ['PORT'])
 
+device = 'cuda'
 model_pool = {}
-def get_model(model_id):
+def get_model(module, model_id):
     if model_id in model_pool:
         model_pool[model_id]["last_used_at"] = time.time()
         return model_pool[model_id]['model']
@@ -23,11 +26,11 @@ def get_model(model_id):
         if (model_id == 'pyannote'):
             pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1")
             # send pipeline to GPU (when available)
-            pipeline.to(torch.device("cuda"))
+            pipeline.to(torch.device(device))
             model = pipeline
             
         else:
-            model = whisper.load_model(model_id)
+            model = module.load_model(model_id, device=device)
         delta = time.time() - start_time
         # stderr 回傳時間和 model_id
         print(f"load model: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}, model_id: {model_id}, time: {delta:.2f} seconds", file=sys.stderr)
@@ -62,7 +65,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                 print(f"process: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}, id: {id}, file: {input_file}", file=sys.stderr)
                 # 使用 Whisper 模型進行轉錄
                 start_time = time.time()
-                model = get_model(model_id)
+                model = get_model(whisper, model_id)
                 result = model.transcribe(input_file, language=language, clip_timestamps=clip_timestamps)
                 delta = time.time() - start_time
                 # stderr 輸出轉錄時間
@@ -73,8 +76,38 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                     "id": id,
                     "output": result
                 })
+            elif method == 'whisperx':
+                language = post_data.get("language", "zh")
+                model_id = post_data.get("model_id", "turbo")
+                diarize = post_data.get("diarize", False)
+
+                # stderr 輸出現在時間、id 和檔案名稱
+                print(f"process: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}, id: {id}, file: {input_file}", file=sys.stderr)
+                # 使用 Whisperx 模型進行轉錄
+                start_time = time.time()
+                model = get_model(whisperx, model_id)
+                audio = whisperx.load_audio(input_file)
+                result = model.transcribe(audio, language=language)
+                delta = time.time() - start_time
+
+                # Align whisper output
+                model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=device)
+                result = whisperx.align(result["segments"], model_a, metadata, audio, device, return_char_alignments=True)
+                # Assign speaker labels
+                diarize_model = whisperx.DiarizationPipeline(device=device)
+                diarize_segments = diarize_model(audio)
+                result = whisperx.assign_word_speakers(diarize_segments, result)
+
+                # stderr 輸出轉錄時間
+                print(f"process: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}, id: {id}, file: {input_file}, time: {delta:.2f} seconds", file=sys.stderr)
+                
+                # 輸出結果
+                output = json.dumps({
+                    "id": id,
+                    "output": result
+                })
             elif method == 'pyannote':
-                model = get_model('pyannote')
+                model = get_model(whisper, 'pyannote')
                 diarization, embeddings = model(input_file, return_embeddings=True)
                 # print the result
                 sentences = []
@@ -117,6 +150,7 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(output.encode('utf-8'))
         except Exception as e:
+            traceback.print_exc()
             # 輸出錯誤訊息
             print(f"Error: {e}", file=sys.stderr)
             self.send_response(500)
