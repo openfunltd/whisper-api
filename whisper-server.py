@@ -9,7 +9,7 @@ import gc
 from pyannote.audio import Pipeline
 import traceback
 
-PORT = 31500 
+PORT = 8080
 if 'PORT' in os.environ:
     PORT = int(os.environ['PORT'])
 
@@ -90,13 +90,15 @@ class MyHandler(http.server.BaseHTTPRequestHandler):
                 result = model.transcribe(audio, language=language)
                 delta = time.time() - start_time
 
-                # Align whisper output
-                model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=device)
-                result = whisperx.align(result["segments"], model_a, metadata, audio, device, return_char_alignments=True)
-                # Assign speaker labels
-                diarize_model = whisperx.DiarizationPipeline(device=device)
-                diarize_segments = diarize_model(audio)
-                result = whisperx.assign_word_speakers(diarize_segments, result)
+                if diarize:
+                    # Align whisper output
+                    model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=device)
+                    result = whisperx.align(result["segments"], model_a, metadata, audio, device, return_char_alignments=True)
+
+                    # Assign speaker labels
+                    diarize_model = whisperx.DiarizationPipeline(device=device)
+                    diarize_segments = diarize_model(audio)
+                    result = whisperx.assign_word_speakers(diarize_segments, result)
 
                 # stderr 輸出轉錄時間
                 print(f"process: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}, id: {id}, file: {input_file}, time: {delta:.2f} seconds", file=sys.stderr)
