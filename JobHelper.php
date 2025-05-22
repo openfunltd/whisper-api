@@ -137,20 +137,23 @@ class JobHelper
                 throw new Exception("readyPlayer not found");
             }
             $m3u8_url = $matches[1];
-            if (preg_match('#/Play/Clip/1M/(\d+)#', $url, $matches)) {
+            error_log("got m3u8_url: $m3u8_url");
+            if (preg_match('#/Play/(Clip|Full)/1M/(\d+)#', $url, $matches)) {
                 $url = str_replace('/1M/', '/300K/', $url);
-                $video_id = $matches[1];
-                $tmp_wav_file = "{$data_dir}/tmp/lyivod-clip-{$video_id}.wav";
+                $video_id = $matches[2];
+                $type = $matches[1];
+                $tmp_wav_file = "{$data_dir}/tmp/lyivod-{$type}-{$video_id}.wav";
                 if (file_exists($tmp_wav_file)) {
                     $logger("already downloaded", $tmp_wav_file);
                     return $tmp_wav_file;
                 }
                 $logger("download ivod and merge to wav", $tmp_wav_file);
-                $cmd = (sprintf("php %s %s %s %s",
+                $cmd = (sprintf("php %s %s %s %s %s",
                     escapeshellarg(__DIR__ . "/customs/get-ly-ivod-clip.php"),
                     escapeshellarg($video_id),
+                    escapeshellarg($type),
                     escapeshellarg($tmp_wav_file),
-                    escapeshellarg($data_dir . "/tmp")
+                    escapeshellarg($data_dir . "/tmp/" . $video_id)
                 ));
                 error_log($cmd);
                 system($cmd, $ret);

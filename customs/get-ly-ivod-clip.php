@@ -1,9 +1,13 @@
 <?php
 
-$video_id = $_SERVER['argv'][1];
+include(__DIR__ . "/../init.inc.php");
 
-$get_m3u8_by_id = function($video_id) {
-    $url = sprintf("https://ivod.ly.gov.tw/Play/Clip/300K/%d", $video_id);
+$video_id = $_SERVER['argv'][1];
+$type = $_SERVER['argv'][2];
+$mylist = [];
+
+$get_m3u8_by_id = function($video_id, $type) use (&$mylist) {
+    $url = sprintf("https://ivod.ly.gov.tw/Play/%s/300K/%d", $type, $video_id);
     $curl = curl_init();
     curl_setopt($curl, CURLOPT_URL, $url);
     curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
@@ -11,7 +15,8 @@ $get_m3u8_by_id = function($video_id) {
     curl_setopt($curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
     $content = curl_exec($curl);
     if (!preg_match('#readyPlayer\("([^"]*)#', $content, $matches)) {
-        throw new Exception("readyPlayer not found");
+        print_r($content);
+        throw new Exception("readyPlayer not found: " . $url);
     }
     curl_close($curl);
     $url = $matches[1];
@@ -19,18 +24,26 @@ $get_m3u8_by_id = function($video_id) {
         throw new Exception("Invalid URL");
     }
     $url = str_replace('playlist.m3u8', 'chunklist.m3u8', $url);
+    $curl = curl_init($url);
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($curl, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+    $content = curl_exec($curl);
+    if (!$content) {
+        throw new Exception("Failed to get {$url}");
+    }
+    $mylist = explode("\n", trim($content));
     return $url;
 };
 if (!$video_id) {
     throw new Exception("Invalid video_id");
 }
-$url = $get_m3u8_by_id($video_id);
+$url = $get_m3u8_by_id($video_id, $type);
 
-$output = $_SERVER['argv'][2];
+$output = $_SERVER['argv'][3];
 if (!$output) {
     $output = "output.mp4";
 }
-$cache_dir = $_SERVER['argv'][3];
+$cache_dir = $_SERVER['argv'][4];
 
 if (!$cache_dir) {
     $cache_dir = __DIR__;
@@ -43,20 +56,17 @@ if (!file_exists($cache_dir)) {
 
 // get all ivod-lyvod.cdn.hinet.net IP
 $ips = gethostbynamel('ivod-lyvod.cdn.hinet.net');
-$content = file_get_contents($url);
-if (!$content) {
-    throw new Exception("Failed to get {$url}");
-}
-$lines = explode("\n", trim($content));
-$total = count($lines);
+$total = count($mylist);
 $seq = 0;
 file_put_contents($cache_dir . '/mylist.txt', '');
 $files = [];
-foreach ($lines as $key => $line) {
+for ($key = 0; $key < count($mylist); $key ++) {
+    $line = $mylist[$key];
     if (strpos($line, '#') === 0) {
         continue;
     }
-    for ($retry = 0; $retry < 3; $retry ++) {
+    for ($retry = 0; $retry < 9; $retry ++) {
+        $line = $mylist[$key];
         $ip = $ips[$seq % count($ips)];
         $seq++;
 
@@ -64,18 +74,19 @@ foreach ($lines as $key => $line) {
         $file_url = str_replace('chunklist.m3u8', $filename, $url);
 
         $args = '--max-time 3 --connect-timeout 3 --retry 0';
-        $cmd = sprintf('curl %s --resolve ivod-lyvod.cdn.hinet.net:443:%s -o %s %s', $args, $ip, escapeshellarg($cache_dir . '/' . $filename), escapeshellarg($file_url));
+        $cmd = sprintf('curl %s -4 --resolve ivod-lyvod.cdn.hinet.net:443:%s -o %s %s', $args, $ip, escapeshellarg($cache_dir . '/' . $filename), escapeshellarg($file_url));
         error_log("{$key}/{$total}: {$cmd}");
         system($cmd, $ret);
-        if ($ret == 0) {
+        if (filesize($cache_dir . "/" . $filename) and $ret == 0) {
             file_put_contents($cache_dir . '/mylist.txt', "file '$filename'\n", FILE_APPEND);
             $files[] = $filename;
             //sleep(1);
             break;
         }
-        sleep(3);
+        sleep($retry);
+        error_log("{$key}/{$total}: {$cmd} failed, retry {$retry}");
 
-        $url = $get_m3u8_by_id($video_id);
+        $url = $get_m3u8_by_id($video_id, $type);
     }
     if ($retry >= 3) {
         throw new Exception("Failed to download {$file_url}");
